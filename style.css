@@ -1,11 +1,12 @@
-body, html {
-    height: 100%;
-    margin: 0;
-    overflow: hidden;
-    background: #000000;
+body,
+html {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #000000;
 }
 
 canvas {
-    /* This will remove the border and scrollbar from the canvas */
-    display: block;
+  /* This will remove the border and scrollbar from the canvas */
+  display: block;
 }
