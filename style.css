@@ -6,6 +6,6 @@ body, html {
 }
 
 canvas {
-    /*  This will remove the border and scrollbar from the canvas */
+    /* This will remove the border and scrollbar from the canvas */
     display: block;
 }
