@@ -3,14 +3,35 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Matrix Effect</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="description" content="Interactive Matrix digital rain animation with keyboard controls and colour customisation">
+    <meta name="author" content="Matrix Rain">
+    <meta name="theme-color" content="#000000">
+    <title>Matrix Code Rain - Interactive Digital Rain Effect</title>
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
-    <!-- Create a canvas element -->
-    <canvas id="matrixCanvas"></canvas>
+    <!-- Main canvas element for the animation -->
+    <canvas id="matrixCanvas" role="img" aria-label="Matrix digital rain animation"></canvas>
+
+    <!-- Control instructions overlay -->
+    <div class="controls-overlay" role="complementary" aria-label="Keyboard controls">
+        <div class="controls-content">
+            <h2>Controls</h2>
+            <ul>
+                <li><kbd>Space</kbd> or <kbd>P</kbd> - Pause/Resume</li>
+                <li><kbd>C</kbd> - Cycle colour schemes</li>
+                <li><kbd>R</kbd> - Reset animation</li>
+                <li><strong>Mouse</strong> - Interact with columns</li>
+            </ul>
+            <button id="closeControls" aria-label="Close controls">Close</button>
+        </div>
+    </div>
+
+    <!-- Button to show controls -->
+    <button id="showControls" class="show-controls-btn" aria-label="Show keyboard controls">?</button>
+
     <script src="script.js"></script>
 </body>
 
