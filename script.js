@@ -14,7 +14,10 @@ const CONFIG = {
     MAX_SPEED: 1.5,
     HEAD_BRIGHTNESS: 1.0,
     TRAIL_BRIGHTNESS: 0.6,
-    DEFAULT_FPS: 30
+    DEFAULT_FPS: 30,
+    SPEED_INCREMENT: 0.2,
+    MIN_SPEED_MULTIPLIER: 0.3,
+    MAX_SPEED_MULTIPLIER: 3.0
 };
 
 /**
@@ -32,9 +35,30 @@ const SYMBOLS = {
  * Colour schemes for the animation
  */
 const COLOUR_SCHEMES = {
-    classic: ["#0F0", "#3F3", "#6F6", "#9F9"],
-    bright: ["#0F0", "#3F3", "#6F6", "#9F9", "#CF9", "#FFF"],
-    cyber: ["#00FF41", "#008F11", "#00FF41", "#FFFFFF"]
+    classic: {
+        name: "Classic Green",
+        head: "#FFFFFF",
+        body: "#0F0",
+        tail: "#003300"
+    },
+    bright: {
+        name: "Bright Matrix",
+        head: "#FFFFFF",
+        body: "#00FF41",
+        tail: "#008F11"
+    },
+    cyber: {
+        name: "Cyber Blue",
+        head: "#FFFFFF",
+        body: "#00FFFF",
+        tail: "#0066AA"
+    },
+    amber: {
+        name: "Amber Terminal",
+        head: "#FFFFFF",
+        body: "#FFAA00",
+        tail: "#664400"
+    }
 };
 
 /**
@@ -62,9 +86,10 @@ class MatrixColumn {
 
     /**
      * Updates the column position
+     * @param {number} speedMultiplier - Global speed multiplier
      */
-    update() {
-        this.y += this.speed;
+    update(speedMultiplier = 1.0) {
+        this.y += this.speed * speedMultiplier;
     }
 
     /**
@@ -98,8 +123,9 @@ class MatrixRain {
         this.columns = [];
         this.animationId = null;
         this.isPaused = false;
-        this.colourScheme = COLOUR_SCHEMES.bright;
+        this.currentScheme = "bright";
         this.mouseColumn = null;
+        this.speedMultiplier = 1.0;
 
         this.initialise();
         this.setupEventListeners();
@@ -190,11 +216,27 @@ class MatrixRain {
                 break;
             case "c":
                 // C key cycles through colour schemes
+                e.preventDefault();
                 this.cycleColourScheme();
                 break;
             case "r":
                 // R key resets the animation
+                e.preventDefault();
                 this.reset();
+                break;
+            case "arrowup":
+            case "+":
+            case "=":
+                // Arrow up or + increases speed
+                e.preventDefault();
+                this.increaseSpeed();
+                break;
+            case "arrowdown":
+            case "-":
+            case "_":
+                // Arrow down or - decreases speed
+                e.preventDefault();
+                this.decreaseSpeed();
                 break;
         }
     }
@@ -211,11 +253,34 @@ class MatrixRain {
      * Cycles through available colour schemes
      */
     cycleColourScheme() {
-        const schemes = Object.values(COLOUR_SCHEMES);
-        const currentIndex = schemes.indexOf(this.colourScheme);
-        const nextIndex = (currentIndex + 1) % schemes.length;
-        this.colourScheme = schemes[nextIndex];
-        console.log("Colour scheme changed");
+        const schemeNames = Object.keys(COLOUR_SCHEMES);
+        const currentIndex = schemeNames.indexOf(this.currentScheme);
+        const nextIndex = (currentIndex + 1) % schemeNames.length;
+        this.currentScheme = schemeNames[nextIndex];
+        const schemeName = COLOUR_SCHEMES[this.currentScheme].name;
+        console.log(`Colour scheme: ${schemeName}`);
+    }
+
+    /**
+     * Increases the animation speed
+     */
+    increaseSpeed() {
+        this.speedMultiplier = Math.min(
+            CONFIG.MAX_SPEED_MULTIPLIER,
+            this.speedMultiplier + CONFIG.SPEED_INCREMENT
+        );
+        console.log(`Speed: ${this.speedMultiplier.toFixed(1)}x`);
+    }
+
+    /**
+     * Decreases the animation speed
+     */
+    decreaseSpeed() {
+        this.speedMultiplier = Math.max(
+            CONFIG.MIN_SPEED_MULTIPLIER,
+            this.speedMultiplier - CONFIG.SPEED_INCREMENT
+        );
+        console.log(`Speed: ${this.speedMultiplier.toFixed(1)}x`);
     }
 
     /**
@@ -266,14 +331,16 @@ class MatrixRain {
         // Set font properties
         this.context.font = `${CONFIG.FONT_SIZE}px monospace`;
 
+        // Get current colour scheme
+        const scheme = COLOUR_SCHEMES[this.currentScheme];
+
         // Draw each column
         this.columns.forEach((column, index) => {
             // Get random symbol for this frame
             const symbol = column.getRandomSymbol();
 
-            // Select colour for the head character (brightest)
-            const colour = this.colourScheme[Math.floor(Math.random() * this.colourScheme.length)];
-            this.context.fillStyle = colour;
+            // Use the body colour for most characters
+            this.context.fillStyle = scheme.body;
 
             // Calculate position
             const x = column.x * CONFIG.FONT_SIZE;
@@ -282,8 +349,14 @@ class MatrixRain {
             // Draw the character
             this.context.fillText(symbol, x, y);
 
-            // Update column position
-            column.update();
+            // Draw a brighter head character
+            if (y > CONFIG.FONT_SIZE) {
+                this.context.fillStyle = scheme.head;
+                this.context.fillText(column.getRandomSymbol(), x, y);
+            }
+
+            // Update column position with speed multiplier
+            column.update(this.speedMultiplier);
 
             // Reset column if it goes off screen
             if (column.y * CONFIG.FONT_SIZE > this.canvas.height && Math.random() > CONFIG.RESET_PROBABILITY) {
@@ -378,6 +451,8 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log("Matrix Rain Controls:");
         console.log("- SPACE or P: Pause/Resume");
         console.log("- C: Cycle colour schemes");
+        console.log("- ↑ or +: Increase speed");
+        console.log("- ↓ or -: Decrease speed");
         console.log("- R: Reset animation");
         console.log("- Mouse: Interact with columns");
         console.log("- Click ? button for help");
