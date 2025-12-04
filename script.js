@@ -74,6 +74,8 @@ class MatrixColumn {
         this.x = x;
         this.reset(canvasHeight);
         this.speed = CONFIG.MIN_SPEED + Math.random() * (CONFIG.MAX_SPEED - CONFIG.MIN_SPEED);
+        this.trail = [];
+        this.trailLength = 15 + Math.floor(Math.random() * 10);
     }
 
     /**
@@ -82,6 +84,7 @@ class MatrixColumn {
      */
     reset(canvasHeight) {
         this.y = Math.floor(Math.random() * canvasHeight / CONFIG.FONT_SIZE) * -1;
+        this.trail = [];
     }
 
     /**
@@ -90,6 +93,19 @@ class MatrixColumn {
      */
     update(speedMultiplier = 1.0) {
         this.y += this.speed * speedMultiplier;
+
+        // Update trail
+        if (this.y > 0) {
+            this.trail.unshift({
+                y: this.y,
+                symbol: this.getRandomSymbol()
+            });
+
+            // Keep trail at specified length
+            if (this.trail.length > this.trailLength) {
+                this.trail.pop();
+            }
+        }
     }
 
     /**
@@ -324,36 +340,46 @@ class MatrixRain {
      * Draws a single frame of the animation
      */
     draw() {
-        // Create fade effect for trailing characters
-        this.context.fillStyle = `rgba(0, 0, 0, ${CONFIG.FADE_ALPHA})`;
+        // Create fade effect with darker background
+        this.context.fillStyle = `rgba(0, 0, 0, 0.1)`;
         this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Set font properties
-        this.context.font = `${CONFIG.FONT_SIZE}px monospace`;
+        // Set font properties with bold for better visibility
+        this.context.font = `bold ${CONFIG.FONT_SIZE}px monospace`;
 
         // Get current colour scheme
         const scheme = COLOUR_SCHEMES[this.currentScheme];
 
         // Draw each column
-        this.columns.forEach((column, index) => {
-            // Get random symbol for this frame
-            const symbol = column.getRandomSymbol();
-
-            // Use the body colour for most characters
-            this.context.fillStyle = scheme.body;
-
-            // Calculate position
+        this.columns.forEach((column) => {
             const x = column.x * CONFIG.FONT_SIZE;
-            const y = column.y * CONFIG.FONT_SIZE;
 
-            // Draw the character
-            this.context.fillText(symbol, x, y);
+            // Draw the trail
+            column.trail.forEach((char, index) => {
+                // Calculate opacity based on position in trail
+                const opacity = 1 - (index / column.trailLength);
 
-            // Draw a brighter head character
-            if (y > CONFIG.FONT_SIZE) {
-                this.context.fillStyle = scheme.head;
-                this.context.fillText(column.getRandomSymbol(), x, y);
-            }
+                // Determine colour based on position
+                let colour;
+                if (index === 0) {
+                    // Brightest head character
+                    colour = scheme.head;
+                } else if (index < 3) {
+                    // Near head - bright body colour
+                    colour = scheme.body;
+                } else {
+                    // Fading tail
+                    colour = scheme.tail;
+                }
+
+                // Parse hex colour and add opacity
+                const r = parseInt(colour.slice(1, 3), 16);
+                const g = parseInt(colour.slice(3, 5), 16);
+                const b = parseInt(colour.slice(5, 7), 16);
+
+                this.context.fillStyle = `rgba(${r}, ${g}, ${b}, ${opacity})`;
+                this.context.fillText(char.symbol, x, char.y * CONFIG.FONT_SIZE);
+            });
 
             // Update column position with speed multiplier
             column.update(this.speedMultiplier);
