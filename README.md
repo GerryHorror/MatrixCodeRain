@@ -2,7 +2,7 @@
 
 A small canvas tribute to the original Matrix trilogy, built with plain HTML, CSS and JavaScript.
 
-The first sequence is **THE MATRIX**: falling code gathers into the title, holds, then falls away. Background rain continues through the sequence. The loop takes 15 seconds: three seconds of rain, four of formation, three holding the title, two releasing it, then three of rain.
+The first sequence is **THE MATRIX (1999)**: falling code gathers into the title and year, holds, then falls away. Background rain continues through the sequence. The loop takes 15 seconds: three seconds of rain, four of formation, three holding the title, two releasing it, then three of rain.
 
 ## Run
 

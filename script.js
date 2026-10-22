@@ -177,6 +177,8 @@ class MatrixRain {
         ink.fillText("THE", this.width / 2, this.height / 2 - size * 0.56);
         ink.font = `bold ${size}px serif`;
         ink.fillText("MATRIX", this.width / 2, this.height / 2 + size * 0.12);
+        ink.font = `bold ${size * 0.4}px monospace`;
+        ink.fillText("1999", this.width / 2, this.height / 2 + size * 0.9);
         const pixels = ink.getImageData(0, 0, mask.width, mask.height).data;
         this.titleCell = Math.max(3, Math.min(8, size / 18));
         this.titleGlyphs = [];
