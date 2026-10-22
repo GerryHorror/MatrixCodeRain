@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 
 const context = { setTransform() {}, fillRect() {}, fillText() {}, clearRect() {},
+    drawImage(image, x, y, width, height) { this.lastArtwork = { image, x, y, width, height }; },
     getImageData: () => ({ data: new Uint8ClampedArray(800 * 600 * 4).fill(255) }) };
 const canvas = { getContext: () => context, addEventListener() {}, removeEventListener() {},
     setAttribute(name, value) { this[name] = value; } };
@@ -76,4 +77,24 @@ for (const [index, label] of [[1, 'RELOADED (2003)'], [2, 'REVOLUTIONS (2003)'],
 moving.filmIndex = 2;
 moving.reset();
 assert.equal(moving.filmIndex, 0, 'reset returns to the first film');
-console.log('Animation checks passed: timing, pause, pixel density, glyph grid, reduced motion, title hold, resize, loop, reset, trilogy order and accessible titles.');
+const artwork = [{ naturalWidth: 509, naturalHeight: 99 }, null,
+    { naturalWidth: 1024, naturalHeight: 246 }];
+const branded = new sandbox.MatrixRain('matrixCanvas', artwork);
+assert.equal(context.lastArtwork.image, artwork[0], 'uses the supplied wordmark');
+for (const [width, height] of [[390, 844], [844, 390], [1280, 800]]) {
+    sandbox.window.innerWidth = width;
+    sandbox.window.innerHeight = height;
+    branded.filmIndex = 2;
+    branded.handleResize();
+    const drawn = context.lastArtwork;
+    assert.equal(drawn.image, artwork[2]);
+    assert.ok(drawn.x >= 0 && drawn.x + drawn.width <= width, 'artwork fits horizontally');
+    assert.ok(drawn.y >= 0 && drawn.y + drawn.height <= height, 'artwork fits vertically');
+    assert.ok(Math.abs(drawn.width / drawn.height - 1024 / 246) < 0.001, 'preserves wordmark proportions');
+}
+context.lastArtwork = null;
+branded.filmIndex = 1;
+branded.createTitle();
+assert.equal(context.lastArtwork, null, 'missing artwork uses the text fallback');
+assert.ok(branded.titleGlyphs.length > 0);
+console.log('Animation checks passed: timing, pause, pixel density, glyph grid, reduced motion, title hold, resize, loop, reset, trilogy order, accessible titles, artwork fit and fallback.');

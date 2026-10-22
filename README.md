@@ -34,10 +34,14 @@ Title timing stays fixed when rain speed changes. Resizing preserves the current
 
 Run `node --check script.js` and `node tests/animation.cjs`.
 
-The focused checks cover refresh-rate-independent timing, pause, pixel density, grid spacing, reduced motion, the title hold, resizing, trilogy order, accessible titles, looping and reset. They use a canvas stub; actual typography requires browser inspection.
+The focused checks cover refresh-rate-independent timing, pause, pixel density, grid spacing, reduced motion, the title hold, resizing, trilogy order, accessible titles, looping, reset, artwork proportions and text fallback. They use a canvas stub; actual typography requires browser inspection.
 
 Browser smoke verification covered all three films in order, their years, return to the first film, pause freezing the canvas, resizing while on a sequel, and absence of JavaScript errors. Desktop captures of both sequels and a phone capture of Revolutions were inspected. Earlier checks covered title release, reduced motion and controls opening and closing with Escape. Captures and browser session files stay local and are ignored by Git.
 
+The wordmark pass also verified that all three artwork masks render, inspected settled titles at desktop and phone sizes, opened the page directly from disk with readable canvas pixels, and simulated failed image decoding to check the text fallback.
+
 ## Lettering
 
-The title uses browser fonts as glyph masks; it does not reproduce the films' custom lettering.
+Each film uses sourced wordmark artwork as a mask, preserving its letter shapes, connected serifs, spacing and subtitle treatment. The rain renders those silhouettes using small glyphs rather than displaying the original images. Fine details are limited by glyph spacing and screen size; this is not a pixel-identical theatrical title recreation. Years remain browser text.
+
+The masks are embedded locally, with no external fonts, image requests or build step. If artwork fails to decode, that film falls back to the previous browser text mask. See [artwork sources and preparation](./assets/wordmarks/SOURCES.md) for provenance and rights notes.

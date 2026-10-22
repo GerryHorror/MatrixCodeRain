@@ -132,7 +132,8 @@ class MatrixRain {
      * Initialises the matrix rain animation
      * @param {string} canvasId - The ID of the canvas element
      */
-    constructor(canvasId) {
+    constructor(canvasId, wordmarks = []) {
+        this.wordmarks = wordmarks;
         this.canvas = document.getElementById(canvasId);
         if (!this.canvas) {
             throw new Error(`Canvas element with ID "${canvasId}" not found`);
@@ -179,22 +180,33 @@ class MatrixRain {
         mask.height = this.height;
         const ink = mask.getContext("2d");
         const size = Math.min(this.width / 4.5, this.height / 3, 180);
-        const centreY = this.height / 2 - (film.subtitle ? size * 0.22 : 0);
         ink.textAlign = "center";
         ink.textBaseline = "middle";
         ink.fillStyle = "white";
-        ink.font = `bold ${size * 0.34}px serif`;
-        ink.fillText("THE", this.width / 2, centreY - size * 0.56);
-        ink.font = `bold ${size}px serif`;
-        ink.fillText("MATRIX", this.width / 2, centreY + size * 0.12);
-        if (film.subtitle) {
-            ink.font = `bold ${size * 0.5}px monospace`;
-            ink.fillText(film.subtitle, this.width / 2, centreY + size * 0.85);
+        const wordmark = this.wordmarks[this.filmIndex];
+        if (wordmark) {
+            const width = Math.min(this.width * 0.88, this.height * 2, 1100);
+            const height = width * wordmark.naturalHeight / wordmark.naturalWidth;
+            const top = this.height / 2 - height / 2 - size * 0.25;
+            ink.drawImage(wordmark, (this.width - width) / 2, top, width, height);
+            ink.font = `bold ${size * 0.32}px monospace`;
+            ink.fillText(film.year, this.width / 2, top + height + size * 0.45);
+        } else {
+            // Keep the sequence usable if a local artwork asset cannot decode.
+            const centreY = this.height / 2 - (film.subtitle ? size * 0.22 : 0);
+            ink.font = `bold ${size * 0.34}px serif`;
+            ink.fillText("THE", this.width / 2, centreY - size * 0.56);
+            ink.font = `bold ${size}px serif`;
+            ink.fillText("MATRIX", this.width / 2, centreY + size * 0.12);
+            if (film.subtitle) {
+                ink.font = `bold ${size * 0.5}px monospace`;
+                ink.fillText(film.subtitle, this.width / 2, centreY + size * 0.85);
+            }
+            ink.font = `bold ${size * 0.4}px monospace`;
+            ink.fillText(film.year, this.width / 2, centreY + size * (film.subtitle ? 1.5 : 0.9));
         }
-        ink.font = `bold ${size * 0.4}px monospace`;
-        ink.fillText(film.year, this.width / 2, centreY + size * (film.subtitle ? 1.5 : 0.9));
         const pixels = ink.getImageData(0, 0, mask.width, mask.height).data;
-        this.titleCell = Math.max(3, Math.min(8, size / 18));
+        this.titleCell = wordmark ? Math.max(1.5, Math.min(4, size / 40)) : Math.max(3, Math.min(8, size / 18));
         this.titleGlyphs = [];
         for (let y = this.titleCell; y < this.height; y += this.titleCell) {
             for (let x = this.titleCell; x < this.width; x += this.titleCell) {
@@ -590,10 +602,23 @@ class UIController {
 /**
  * Initialise the application when the DOM is fully loaded
  */
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
     try {
+        const wordmarks = typeof TITLE_WORDMARKS === "undefined" ? [] : await Promise.all(
+            TITLE_WORDMARKS.map(async (source) => {
+                const image = new Image();
+                image.src = source;
+                try {
+                    await image.decode();
+                    return image;
+                } catch (error) {
+                    console.warn("Title artwork unavailable; using text fallback", error);
+                    return null;
+                }
+            })
+        );
         // Initialise the matrix rain animation
-        const matrixRain = new MatrixRain("matrixCanvas");
+        const matrixRain = new MatrixRain("matrixCanvas", wordmarks);
 
         // Initialise the UI controller
         const uiController = new UIController();
