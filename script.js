@@ -38,7 +38,7 @@ const COLOUR_SCHEMES = {
     classic: {
         name: "Classic Green",
         head: "#FFFFFF",
-        body: "#0F0",
+        body: "#00FF00",
         tail: "#003300"
     },
     bright: {
@@ -92,12 +92,13 @@ class MatrixColumn {
      * @param {number} speedMultiplier - Global speed multiplier
      */
     update(speedMultiplier = 1.0) {
+        const previousRow = Math.floor(this.y);
         this.y += this.speed * speedMultiplier;
 
         // Update trail
-        if (this.y > 0) {
+        for (let row = Math.max(1, previousRow + 1); row <= Math.floor(this.y); row++) {
             this.trail.unshift({
-                y: this.y,
+                y: row,
                 symbol: this.getRandomSymbol()
             });
 
@@ -142,10 +143,15 @@ class MatrixRain {
         this.currentScheme = "bright";
         this.mouseColumn = null;
         this.speedMultiplier = 1.0;
+        this.lastTime = null;
+        this.accumulator = 0;
+        this.motionPreference = window.matchMedia("(prefers-reduced-motion: reduce)");
+        this.isPaused = this.motionPreference.matches;
 
         this.initialise();
         this.setupEventListeners();
         this.start();
+        if (this.isPaused) this.draw();
     }
 
     /**
@@ -160,19 +166,23 @@ class MatrixRain {
      * Resizes the canvas to match the window size
      */
     resizeCanvas() {
-        this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight;
+        this.width = window.innerWidth;
+        this.height = window.innerHeight;
+        const pixelRatio = window.devicePixelRatio || 1;
+        this.canvas.width = Math.round(this.width * pixelRatio);
+        this.canvas.height = Math.round(this.height * pixelRatio);
+        this.context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
     }
 
     /**
      * Creates the column objects based on canvas width
      */
     createColumns() {
-        const columnCount = Math.floor(this.canvas.width / CONFIG.FONT_SIZE);
+        const columnCount = Math.ceil(this.width / CONFIG.FONT_SIZE);
         this.columns = [];
 
         for (let i = 0; i < columnCount; i++) {
-            this.columns.push(new MatrixColumn(i, this.canvas.height));
+            this.columns.push(new MatrixColumn(i, this.height));
         }
     }
 
@@ -181,18 +191,27 @@ class MatrixRain {
      */
     setupEventListeners() {
         // Window resize handler
-        window.addEventListener("resize", () => this.handleResize());
+        this.onResize = () => this.handleResize();
+        window.addEventListener("resize", this.onResize);
 
         // Mouse movement handler
-        this.canvas.addEventListener("mousemove", (e) => this.handleMouseMove(e));
+        this.onMouseMove = (e) => this.handleMouseMove(e);
+        this.canvas.addEventListener("mousemove", this.onMouseMove);
 
         // Mouse leave handler
-        this.canvas.addEventListener("mouseleave", () => {
+        this.onMouseLeave = () => {
             this.mouseColumn = null;
-        });
+        };
+        this.canvas.addEventListener("mouseleave", this.onMouseLeave);
 
         // Keyboard controls
-        document.addEventListener("keydown", (e) => this.handleKeyPress(e));
+        this.onKeyDown = (e) => this.handleKeyPress(e);
+        document.addEventListener("keydown", this.onKeyDown);
+        this.onMotionChange = (e) => {
+            this.isPaused = e.matches;
+            this.reset();
+        };
+        this.motionPreference.addEventListener("change", this.onMotionChange);
     }
 
     /**
@@ -201,6 +220,7 @@ class MatrixRain {
     handleResize() {
         this.resizeCanvas();
         this.createColumns();
+        if (this.isPaused) this.draw();
     }
 
     /**
@@ -303,7 +323,10 @@ class MatrixRain {
      * Resets all columns to their initial state
      */
     reset() {
-        this.columns.forEach(column => column.reset(this.canvas.height));
+        this.columns.forEach(column => column.reset(this.height));
+        this.context.clearRect(0, 0, this.width, this.height);
+        this.accumulator = 0;
+        if (this.isPaused) this.draw();
         console.log("Animation reset");
     }
 
@@ -324,16 +347,24 @@ class MatrixRain {
             cancelAnimationFrame(this.animationId);
             this.animationId = null;
         }
+        this.lastTime = null;
     }
 
     /**
      * Main animation loop using requestAnimationFrame
      */
-    animate() {
+    animate(time) {
+        const elapsed = this.lastTime === null || time === undefined ? 0 : Math.min(time - this.lastTime, 100);
+        this.lastTime = time === undefined ? null : time;
         if (!this.isPaused) {
-            this.draw();
+            this.accumulator += elapsed;
+            const step = 1000 / CONFIG.DEFAULT_FPS;
+            while (this.accumulator >= step) {
+                this.draw();
+                this.accumulator -= step;
+            }
         }
-        this.animationId = requestAnimationFrame(() => this.animate());
+        this.animationId = requestAnimationFrame((timestamp) => this.animate(timestamp));
     }
 
     /**
@@ -341,8 +372,8 @@ class MatrixRain {
      */
     draw() {
         // Create fade effect with darker background
-        this.context.fillStyle = `rgba(0, 0, 0, 0.1)`;
-        this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        this.context.fillStyle = `rgba(0, 0, 0, ${CONFIG.FADE_ALPHA})`;
+        this.context.fillRect(0, 0, this.width, this.height);
 
         // Set font properties with bold for better visibility
         this.context.font = `bold ${CONFIG.FONT_SIZE}px monospace`;
@@ -385,8 +416,8 @@ class MatrixRain {
             column.update(this.speedMultiplier);
 
             // Reset column if it goes off screen
-            if (column.y * CONFIG.FONT_SIZE > this.canvas.height && Math.random() > CONFIG.RESET_PROBABILITY) {
-                column.reset(this.canvas.height);
+            if ((column.y - column.trailLength) * CONFIG.FONT_SIZE > this.height && Math.random() > CONFIG.RESET_PROBABILITY) {
+                column.reset(this.height);
             }
         });
     }
@@ -396,9 +427,11 @@ class MatrixRain {
      */
     destroy() {
         this.stop();
-        window.removeEventListener("resize", this.handleResize);
-        this.canvas.removeEventListener("mousemove", this.handleMouseMove);
-        document.removeEventListener("keydown", this.handleKeyPress);
+        window.removeEventListener("resize", this.onResize);
+        this.canvas.removeEventListener("mousemove", this.onMouseMove);
+        this.canvas.removeEventListener("mouseleave", this.onMouseLeave);
+        document.removeEventListener("keydown", this.onKeyDown);
+        this.motionPreference.removeEventListener("change", this.onMotionChange);
     }
 }
 
