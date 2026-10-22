@@ -160,6 +160,65 @@ class MatrixRain {
     initialise() {
         this.resizeCanvas();
         this.createColumns();
+        this.createTitle();
+    }
+
+    /** Sample a text mask into glyphs that fall, settle, then rejoin the rain. */
+    createTitle() {
+        const mask = document.createElement("canvas");
+        mask.width = this.width;
+        mask.height = this.height;
+        const ink = mask.getContext("2d");
+        const size = Math.min(this.width / 4.5, this.height / 3, 180);
+        ink.textAlign = "center";
+        ink.textBaseline = "middle";
+        ink.fillStyle = "white";
+        ink.font = `bold ${size * 0.34}px serif`;
+        ink.fillText("THE", this.width / 2, this.height / 2 - size * 0.56);
+        ink.font = `bold ${size}px serif`;
+        ink.fillText("MATRIX", this.width / 2, this.height / 2 + size * 0.12);
+        const pixels = ink.getImageData(0, 0, mask.width, mask.height).data;
+        this.titleCell = Math.max(3, Math.min(8, size / 18));
+        this.titleGlyphs = [];
+        for (let y = this.titleCell; y < this.height; y += this.titleCell) {
+            for (let x = this.titleCell; x < this.width; x += this.titleCell) {
+                if (pixels[(Math.floor(y) * mask.width + Math.floor(x)) * 4 + 3] < 128) continue;
+                this.titleGlyphs.push({
+                    x, y,
+                    startY: -Math.random() * this.height,
+                    arrival: 0.8 + Math.random() * 3.2,
+                    release: Math.random() * 0.8,
+                    symbol: SYMBOLS.all.charAt(Math.floor(Math.random() * SYMBOLS.all.length))
+                });
+            }
+        }
+        this.sequenceTime = this.motionPreference.matches ? 7 : 0;
+    }
+
+    drawTitle() {
+        const time = this.sequenceTime;
+        if (time < 3 || time >= 12) return;
+        const ctx = this.context;
+        const scheme = COLOUR_SCHEMES[this.currentScheme];
+        ctx.font = `${this.titleCell}px monospace`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        for (const glyph of this.titleGlyphs) {
+            const progress = Math.min(1, (time - 3) / glyph.arrival);
+            const released = Math.max(0, time - 10 - glyph.release);
+            const y = glyph.startY + (glyph.y - glyph.startY) * progress
+                + released * released * this.height;
+            if (y < 0 || y > this.height) continue;
+            if (progress < 1 && Math.random() < 0.2) {
+                glyph.symbol = SYMBOLS.all.charAt(Math.floor(Math.random() * SYMBOLS.all.length));
+            }
+            ctx.globalAlpha = released > 0 ? Math.max(0, 1 - released) : 1;
+            ctx.fillStyle = progress < 1 || released > 0 ? scheme.head : scheme.body;
+            ctx.fillText(glyph.symbol, glyph.x, y);
+        }
+        ctx.globalAlpha = 1;
+        ctx.textAlign = "start";
+        ctx.textBaseline = "alphabetic";
     }
 
     /**
@@ -218,8 +277,11 @@ class MatrixRain {
      * Handles window resize events
      */
     handleResize() {
+        const sequenceTime = this.sequenceTime;
         this.resizeCanvas();
         this.createColumns();
+        this.createTitle();
+        this.sequenceTime = sequenceTime;
         if (this.isPaused) this.draw();
     }
 
@@ -324,6 +386,7 @@ class MatrixRain {
      */
     reset() {
         this.columns.forEach(column => column.reset(this.height));
+        this.createTitle();
         this.context.clearRect(0, 0, this.width, this.height);
         this.accumulator = 0;
         if (this.isPaused) this.draw();
@@ -371,8 +434,12 @@ class MatrixRain {
      * Draws a single frame of the animation
      */
     draw() {
+        if (!this.isPaused) {
+            this.sequenceTime = (this.sequenceTime + 1 / CONFIG.DEFAULT_FPS) % 15;
+        }
         // Create fade effect with darker background
-        this.context.fillStyle = `rgba(0, 0, 0, ${CONFIG.FADE_ALPHA})`;
+        const titleActive = this.sequenceTime >= 3 && this.sequenceTime < 12;
+        this.context.fillStyle = `rgba(0, 0, 0, ${titleActive ? 0.24 : CONFIG.FADE_ALPHA})`;
         this.context.fillRect(0, 0, this.width, this.height);
 
         // Set font properties with bold for better visibility
@@ -380,6 +447,7 @@ class MatrixRain {
 
         // Get current colour scheme
         const scheme = COLOUR_SCHEMES[this.currentScheme];
+        this.context.globalAlpha = titleActive ? 0.22 : 1;
 
         // Draw each column
         this.columns.forEach((column) => {
@@ -420,6 +488,8 @@ class MatrixRain {
                 column.reset(this.height);
             }
         });
+        this.context.globalAlpha = 1;
+        this.drawTitle();
     }
 
     /**

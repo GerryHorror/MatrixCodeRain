@@ -3,14 +3,16 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
-const context = { setTransform() {}, fillRect() {}, fillText() {}, clearRect() {} };
+const context = { setTransform() {}, fillRect() {}, fillText() {}, clearRect() {},
+    getImageData: () => ({ data: new Uint8ClampedArray(800 * 600 * 4).fill(255) }) };
 const canvas = { getContext: () => context, addEventListener() {}, removeEventListener() {} };
 const preference = { matches: false, addEventListener() {}, removeEventListener() {} };
 const sandbox = {
     console, Math,
     window: { innerWidth: 800, innerHeight: 600, devicePixelRatio: 2,
         matchMedia: () => preference, addEventListener() {}, removeEventListener() {} },
-    document: { getElementById: () => canvas, addEventListener() {}, removeEventListener() {} },
+    document: { getElementById: () => canvas, createElement: () => ({ getContext: () => context }),
+        addEventListener() {}, removeEventListener() {} },
     requestAnimationFrame: () => 1, cancelAnimationFrame() {}
 };
 vm.createContext(sandbox);
@@ -42,4 +44,21 @@ assert.ok(column.trail.every(char => Number.isInteger(char.y)), 'glyphs must sta
 preference.matches = true;
 const still = new sandbox.MatrixRain('matrixCanvas');
 assert.equal(still.isPaused, true, 'reduced motion starts paused');
-console.log('Animation checks passed: timing, pause, pixel density, glyph grid, reduced motion.');
+assert.equal(still.sequenceTime, 7, 'reduced motion shows the settled title');
+assert.ok(still.titleGlyphs.length > 0);
+preference.matches = false;
+const moving = new sandbox.MatrixRain('matrixCanvas');
+for (let i = 0; i < 225; i++) moving.draw();
+assert.ok(moving.sequenceTime > 7 && moving.sequenceTime < 8, 'title reaches its hold');
+moving.isPaused = true;
+const pausedAt = moving.sequenceTime;
+moving.draw();
+assert.equal(moving.sequenceTime, pausedAt);
+moving.handleResize();
+assert.equal(moving.sequenceTime, pausedAt, 'resize preserves the sequence phase');
+moving.isPaused = false;
+for (let i = 0; i < 225; i++) moving.draw();
+assert.ok(moving.sequenceTime < 0.1 || moving.sequenceTime > 14.9, 'sequence loops');
+moving.reset();
+assert.equal(moving.sequenceTime, 0, 'reset restarts the sequence');
+console.log('Animation checks passed: timing, pause, pixel density, glyph grid, reduced motion, title hold, resize, loop, reset.');
