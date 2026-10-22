@@ -722,17 +722,15 @@ class UIController {
 document.addEventListener("DOMContentLoaded", async () => {
     try {
         const wordmarks = typeof TITLE_WORDMARKS === "undefined" ? [] : await Promise.all(
-            TITLE_WORDMARKS.map(async (source) => {
+            TITLE_WORDMARKS.map(source => new Promise(resolve => {
                 const image = new Image();
+                image.onload = () => resolve(image);
+                image.onerror = () => {
+                    console.warn("Title artwork unavailable; using text fallback");
+                    resolve(null);
+                };
                 image.src = source;
-                try {
-                    await image.decode();
-                    return image;
-                } catch (error) {
-                    console.warn("Title artwork unavailable; using text fallback", error);
-                    return null;
-                }
-            })
+            }))
         );
         // Initialise the matrix rain animation
         const matrixRain = new MatrixRain("matrixCanvas", wordmarks);

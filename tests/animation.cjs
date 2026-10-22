@@ -10,15 +10,17 @@ const context = { setTransform() {}, fillRect() {}, fillText() {}, clearRect() {
 const canvas = { getContext: () => context, addEventListener() {}, removeEventListener() {},
     setAttribute(name, value) { this[name] = value; } };
 const preference = { matches: false, addEventListener() {}, removeEventListener() {} };
+let domReady;
 const sandbox = {
     console, Math,
     window: { innerWidth: 800, innerHeight: 600, devicePixelRatio: 2,
         matchMedia: () => preference, addEventListener() {}, removeEventListener() {} },
     document: { getElementById: () => canvas, querySelector: () => null, createElement: () => ({ getContext: () => context }),
-        addEventListener() {}, removeEventListener() {} },
+        addEventListener(type, handler) { if (type === 'DOMContentLoaded') domReady = handler; }, removeEventListener() {} },
     requestAnimationFrame: () => 1, cancelAnimationFrame() {}
 };
 vm.createContext(sandbox);
+vm.runInContext(fs.readFileSync('assets/wordmarks.js', 'utf8'), sandbox);
 vm.runInContext(fs.readFileSync('script.js', 'utf8') + '\nthis.MatrixRain = MatrixRain; this.MatrixColumn = MatrixColumn;', sandbox);
 
 const rain = new sandbox.MatrixRain('matrixCanvas');
@@ -142,4 +144,12 @@ assert.equal(moving.isPaused, true, 'Space on a button is handled by the native 
 const headBefore = moving.columns[0].y;
 moving.handleMouseMove({ clientX: 1, clientY: 500 });
 assert.equal(moving.columns[0].y, headBefore, 'pointer cannot move a paused stream');
-console.log('Animation checks passed, including real stream capture, removal from trails, pause, film pacing, depth, artwork fit and fallback.');
+sandbox.Image = class {
+    set src(value) { this.naturalWidth = 509; this.naturalHeight = 99; this.onload(); }
+    decode() { return new Promise(() => {}); }
+};
+vm.runInContext('UIController = class { constructor(rain) { globalThis.startedRain = rain; } };', sandbox);
+domReady().then(() => {
+    assert.ok(sandbox.startedRain.wordmarks.every(image => image instanceof sandbox.Image), 'startup must use loaded images even when decode never resolves');
+    console.log('Animation checks passed, including stream capture, pause, pacing, depth, navigation, artwork fallback and startup with a pending image decoder.');
+}).catch(error => { console.error(error); process.exitCode = 1; });
