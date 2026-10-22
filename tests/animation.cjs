@@ -5,7 +5,8 @@ const vm = require('node:vm');
 
 const context = { setTransform() {}, fillRect() {}, fillText() {}, clearRect() {},
     getImageData: () => ({ data: new Uint8ClampedArray(800 * 600 * 4).fill(255) }) };
-const canvas = { getContext: () => context, addEventListener() {}, removeEventListener() {} };
+const canvas = { getContext: () => context, addEventListener() {}, removeEventListener() {},
+    setAttribute(name, value) { this[name] = value; } };
 const preference = { matches: false, addEventListener() {}, removeEventListener() {} };
 const sandbox = {
     console, Math,
@@ -61,4 +62,18 @@ for (let i = 0; i < 225; i++) moving.draw();
 assert.ok(moving.sequenceTime < 0.1 || moving.sequenceTime > 14.9, 'sequence loops');
 moving.reset();
 assert.equal(moving.sequenceTime, 0, 'reset restarts the sequence');
-console.log('Animation checks passed: timing, pause, pixel density, glyph grid, reduced motion, title hold, resize, loop, reset.');
+assert.equal(moving.filmIndex, 0);
+for (const [index, label] of [[1, 'RELOADED (2003)'], [2, 'REVOLUTIONS (2003)'], [0, 'THE MATRIX (1999)']]) {
+    const previousIndex = moving.filmIndex;
+    for (let i = 0; i < 452 && moving.filmIndex === previousIndex; i++) moving.draw();
+    assert.equal(moving.filmIndex, index, 'films cycle in trilogy order');
+    assert.ok(canvas['aria-label'].includes(label), 'accessible title matches the current film');
+    moving.isPaused = true;
+    moving.handleResize();
+    assert.equal(moving.filmIndex, index, 'resize preserves the current film');
+    moving.isPaused = false;
+}
+moving.filmIndex = 2;
+moving.reset();
+assert.equal(moving.filmIndex, 0, 'reset returns to the first film');
+console.log('Animation checks passed: timing, pause, pixel density, glyph grid, reduced motion, title hold, resize, loop, reset, trilogy order and accessible titles.');

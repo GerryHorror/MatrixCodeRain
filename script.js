@@ -31,6 +31,12 @@ const SYMBOLS = {
     }
 };
 
+const FILMS = [
+    { subtitle: "", year: "1999" },
+    { subtitle: "RELOADED", year: "2003" },
+    { subtitle: "REVOLUTIONS", year: "2003" }
+];
+
 /**
  * Colour schemes for the animation
  */
@@ -145,8 +151,10 @@ class MatrixRain {
         this.speedMultiplier = 1.0;
         this.lastTime = null;
         this.accumulator = 0;
+        this.filmIndex = 0;
         this.motionPreference = window.matchMedia("(prefers-reduced-motion: reduce)");
         this.isPaused = this.motionPreference.matches;
+        this.sequenceTime = this.isPaused ? 7 : 0;
 
         this.initialise();
         this.setupEventListeners();
@@ -165,20 +173,26 @@ class MatrixRain {
 
     /** Sample a text mask into glyphs that fall, settle, then rejoin the rain. */
     createTitle() {
+        const film = FILMS[this.filmIndex];
         const mask = document.createElement("canvas");
         mask.width = this.width;
         mask.height = this.height;
         const ink = mask.getContext("2d");
         const size = Math.min(this.width / 4.5, this.height / 3, 180);
+        const centreY = this.height / 2 - (film.subtitle ? size * 0.22 : 0);
         ink.textAlign = "center";
         ink.textBaseline = "middle";
         ink.fillStyle = "white";
         ink.font = `bold ${size * 0.34}px serif`;
-        ink.fillText("THE", this.width / 2, this.height / 2 - size * 0.56);
+        ink.fillText("THE", this.width / 2, centreY - size * 0.56);
         ink.font = `bold ${size}px serif`;
-        ink.fillText("MATRIX", this.width / 2, this.height / 2 + size * 0.12);
+        ink.fillText("MATRIX", this.width / 2, centreY + size * 0.12);
+        if (film.subtitle) {
+            ink.font = `bold ${size * 0.5}px monospace`;
+            ink.fillText(film.subtitle, this.width / 2, centreY + size * 0.85);
+        }
         ink.font = `bold ${size * 0.4}px monospace`;
-        ink.fillText("1999", this.width / 2, this.height / 2 + size * 0.9);
+        ink.fillText(film.year, this.width / 2, centreY + size * (film.subtitle ? 1.5 : 0.9));
         const pixels = ink.getImageData(0, 0, mask.width, mask.height).data;
         this.titleCell = Math.max(3, Math.min(8, size / 18));
         this.titleGlyphs = [];
@@ -194,7 +208,8 @@ class MatrixRain {
                 });
             }
         }
-        this.sequenceTime = this.motionPreference.matches ? 7 : 0;
+        const title = `THE MATRIX${film.subtitle ? " " + film.subtitle : ""} (${film.year})`;
+        this.canvas.setAttribute("aria-label", `Digital rain forms ${title}, holds, then falls away. Use Space to pause or resume.`);
     }
 
     drawTitle() {
@@ -279,11 +294,9 @@ class MatrixRain {
      * Handles window resize events
      */
     handleResize() {
-        const sequenceTime = this.sequenceTime;
         this.resizeCanvas();
         this.createColumns();
         this.createTitle();
-        this.sequenceTime = sequenceTime;
         if (this.isPaused) this.draw();
     }
 
@@ -388,6 +401,8 @@ class MatrixRain {
      */
     reset() {
         this.columns.forEach(column => column.reset(this.height));
+        this.filmIndex = 0;
+        this.sequenceTime = this.motionPreference.matches ? 7 : 0;
         this.createTitle();
         this.context.clearRect(0, 0, this.width, this.height);
         this.accumulator = 0;
@@ -437,7 +452,12 @@ class MatrixRain {
      */
     draw() {
         if (!this.isPaused) {
-            this.sequenceTime = (this.sequenceTime + 1 / CONFIG.DEFAULT_FPS) % 15;
+            this.sequenceTime += 1 / CONFIG.DEFAULT_FPS;
+            if (this.sequenceTime >= 15) {
+                this.sequenceTime -= 15;
+                this.filmIndex = (this.filmIndex + 1) % FILMS.length;
+                this.createTitle();
+            }
         }
         // Create fade effect with darker background
         const titleActive = this.sequenceTime >= 3 && this.sequenceTime < 12;
