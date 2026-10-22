@@ -14,7 +14,7 @@ const sandbox = {
     console, Math,
     window: { innerWidth: 800, innerHeight: 600, devicePixelRatio: 2,
         matchMedia: () => preference, addEventListener() {}, removeEventListener() {} },
-    document: { getElementById: () => canvas, createElement: () => ({ getContext: () => context }),
+    document: { getElementById: () => canvas, querySelector: () => null, createElement: () => ({ getContext: () => context }),
         addEventListener() {}, removeEventListener() {} },
     requestAnimationFrame: () => 1, cancelAnimationFrame() {}
 };
@@ -47,7 +47,7 @@ assert.ok(column.trail.every(char => Number.isInteger(char.y)), 'glyphs must sta
 preference.matches = true;
 const still = new sandbox.MatrixRain('matrixCanvas');
 assert.equal(still.isPaused, true, 'reduced motion starts paused');
-assert.equal(still.sequenceTime, 7, 'reduced motion shows the settled title');
+assert.equal(still.sequenceTime, 8, 'reduced motion shows the settled title');
 assert.ok(still.titleGlyphs.length > 0);
 preference.matches = false;
 const moving = new sandbox.MatrixRain('matrixCanvas');
@@ -127,4 +127,19 @@ moving.filmIndex = 1;
 moving.createTitle();
 assert.ok(moving.titleGlyphs.every(glyph => glyph.caughtAt !== null), 'Reloaded forms sooner');
 assert.ok(moving.distantColumns.every(column => column.fontSize < 20 && column.speed < 0.5), 'distant streams are smaller and slower');
+moving.isPaused = true;
+moving.filmIndex = 0;
+moving.changeFilm(-1);
+assert.equal(moving.filmIndex, 2, 'previous wraps to Revolutions');
+assert.equal(moving.isPaused, true, 'navigation preserves pause');
+assert.equal(moving.sequenceTime, 8, 'paused navigation shows a settled title');
+moving.changeFilm(1);
+assert.equal(moving.filmIndex, 0, 'next wraps to The Matrix');
+moving.reset();
+assert.equal(moving.sequenceTime, 8, 'paused reset shows the first title');
+moving.handleKeyPress({ key: ' ', target: { closest: selector => selector === 'button, a' }, preventDefault() { throw Error('native button activation intercepted'); } });
+assert.equal(moving.isPaused, true, 'Space on a button is handled by the native button');
+const headBefore = moving.columns[0].y;
+moving.handleMouseMove({ clientX: 1, clientY: 500 });
+assert.equal(moving.columns[0].y, headBefore, 'pointer cannot move a paused stream');
 console.log('Animation checks passed, including real stream capture, removal from trails, pause, film pacing, depth, artwork fit and fallback.');

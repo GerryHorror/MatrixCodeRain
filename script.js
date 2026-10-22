@@ -156,7 +156,7 @@ class MatrixRain {
         this.filmIndex = 0;
         this.motionPreference = window.matchMedia("(prefers-reduced-motion: reduce)");
         this.isPaused = this.motionPreference.matches;
-        this.sequenceTime = this.isPaused ? 7 : 0;
+        this.sequenceTime = this.isPaused ? 8 : 0;
 
         this.initialise();
         this.setupEventListeners();
@@ -235,6 +235,7 @@ class MatrixRain {
         this.titleShade.addColorStop(1, "rgba(0, 0, 0, 0)");
         const title = `THE MATRIX${film.subtitle ? " " + film.subtitle : ""} (${film.year})`;
         this.canvas.setAttribute("aria-label", `Digital rain forms ${title}, holds, then falls away. Use Space to pause or resume.`);
+        this.onStateChange?.();
     }
 
     tintTitle() {
@@ -392,6 +393,7 @@ class MatrixRain {
      * @param {MouseEvent} e - The mouse event
      */
     handleMouseMove(e) {
+        if (this.isPaused || (this.sequenceTime >= FILMS[this.filmIndex].formAt && !this.formationComplete)) return;
         const mouseX = e.clientX;
         const mouseY = e.clientY;
         const columnIndex = Math.floor(mouseX / CONFIG.FONT_SIZE);
@@ -407,6 +409,9 @@ class MatrixRain {
      * @param {KeyboardEvent} e - The keyboard event
      */
     handleKeyPress(e) {
+        if (e.repeat || e.altKey || e.ctrlKey || e.metaKey || document.querySelector("dialog[open]")) return;
+        if (e.target?.closest?.("input, textarea, select, [contenteditable='true']")) return;
+        if (e.key === " " && e.target?.closest?.("button, a")) return;
         switch(e.key.toLowerCase()) {
             case " ":
             case "p":
@@ -423,6 +428,11 @@ class MatrixRain {
                 // R key resets the animation
                 e.preventDefault();
                 this.reset();
+                break;
+            case "arrowleft":
+            case "arrowright":
+                e.preventDefault();
+                this.changeFilm(e.key.toLowerCase() === "arrowleft" ? -1 : 1);
                 break;
             case "arrowup":
             case "+":
@@ -446,6 +456,7 @@ class MatrixRain {
      */
     togglePause() {
         this.isPaused = !this.isPaused;
+        this.onStateChange?.();
         console.log(this.isPaused ? "Animation paused" : "Animation resumed");
     }
 
@@ -491,12 +502,21 @@ class MatrixRain {
     reset() {
         this.columns.forEach(column => column.reset(this.height));
         this.filmIndex = 0;
-        this.sequenceTime = this.motionPreference.matches ? 7 : 0;
+        this.sequenceTime = this.isPaused ? 8 : 0;
         this.createTitle();
         this.context.clearRect(0, 0, this.width, this.height);
         this.accumulator = 0;
         if (this.isPaused) this.draw();
         console.log("Animation reset");
+    }
+
+    changeFilm(direction) {
+        this.filmIndex = (this.filmIndex + direction + FILMS.length) % FILMS.length;
+        this.sequenceTime = this.isPaused ? 8 : 0;
+        this.columns.forEach(column => column.reset(this.height));
+        this.accumulator = 0;
+        this.createTitle();
+        this.draw();
     }
 
     /**
@@ -555,7 +575,7 @@ class MatrixRain {
             if (this.sequenceTime >= film.formAt && !this.formationComplete) this.formTitle();
             for (const column of [...this.columns, ...this.distantColumns]) {
                 if (!forming || column.fontSize !== CONFIG.FONT_SIZE) column.update(this.speedMultiplier);
-                if (!forming && (column.y - column.trailLength) * column.fontSize > this.height && Math.random() > CONFIG.RESET_PROBABILITY) {
+                if ((!forming || column.fontSize !== CONFIG.FONT_SIZE) && (column.y - column.trailLength) * column.fontSize > this.height && Math.random() > CONFIG.RESET_PROBABILITY) {
                     column.reset(this.height);
                 }
             }
@@ -607,56 +627,92 @@ class UIController {
     /**
      * Initialises the UI controller
      */
-    constructor() {
+    constructor(rain) {
+        this.rain = rain;
         this.overlay = document.querySelector(".controls-overlay");
         this.showButton = document.getElementById("showControls");
         this.closeButton = document.getElementById("closeControls");
-
-        if (!this.overlay || !this.showButton || !this.closeButton) {
-            console.warn("UI controls not found in DOM");
-            return;
-        }
-
+        this.tools = document.querySelector(".viewing-controls");
+        this.pauseButton = document.getElementById("togglePause");
+        this.fullscreenButton = document.getElementById("toggleFullscreen");
+        this.filmLabel = document.getElementById("currentFilm");
+        this.message = document.getElementById("viewerMessage");
+        this.rain.onStateChange = () => this.update();
         this.setupEventListeners();
+        this.update();
+        this.showTools();
     }
 
     /**
      * Sets up event listeners for UI controls
      */
     setupEventListeners() {
-        // Show controls overlay
         this.showButton.addEventListener("click", () => this.showControls());
-
-        // Close controls overlay
         this.closeButton.addEventListener("click", () => this.hideControls());
-
-        // Close on escape key
-        document.addEventListener("keydown", (e) => {
-            if (e.key === "Escape" && this.overlay.classList.contains("visible")) {
-                this.hideControls();
-            }
-        });
-
-        // Close when clicking outside the controls content
         this.overlay.addEventListener("click", (e) => {
-            if (e.target === this.overlay) {
-                this.hideControls();
+            if (e.target === this.overlay) this.hideControls();
+        });
+        this.overlay.addEventListener("close", () => {
+            this.showButton.focus();
+            this.showTools();
+        });
+        this.pauseButton.addEventListener("click", () => this.rain.togglePause());
+        document.getElementById("previousFilm").addEventListener("click", () => this.rain.changeFilm(-1));
+        document.getElementById("nextFilm").addEventListener("click", () => this.rain.changeFilm(1));
+        this.fullscreenButton.disabled = !document.fullscreenEnabled;
+        this.fullscreenButton.addEventListener("click", () => this.toggleFullscreen());
+        document.addEventListener("fullscreenchange", () => this.update());
+        window.addEventListener("pointermove", () => this.showTools());
+        window.addEventListener("pointerdown", () => this.showTools());
+        document.addEventListener("focusin", () => this.showTools());
+        document.addEventListener("keydown", (e) => {
+            this.showTools();
+            if (e.key.toLowerCase() === "f" && !e.repeat && !e.altKey && !e.ctrlKey && !e.metaKey && !this.overlay.open
+                && !e.target?.closest?.("input, textarea, select, [contenteditable='true']")) {
+                e.preventDefault();
+                this.toggleFullscreen();
             }
         });
     }
 
-    /**
-     * Shows the controls overlay
-     */
     showControls() {
-        this.overlay.classList.add("visible");
+        this.overlay.showModal();
+        this.showTools();
     }
 
-    /**
-     * Hides the controls overlay
-     */
     hideControls() {
-        this.overlay.classList.remove("visible");
+        this.overlay.close();
+    }
+
+    update() {
+        const film = FILMS[this.rain.filmIndex];
+        this.filmLabel.textContent = `THE MATRIX${film.subtitle ? " " + film.subtitle : ""} · ${film.year}`;
+        this.pauseButton.textContent = this.rain.isPaused ? "Play" : "Pause";
+        this.pauseButton.setAttribute("aria-label", this.rain.isPaused ? "Resume animation" : "Pause animation");
+        this.pauseButton.setAttribute("aria-pressed", String(this.rain.isPaused));
+        this.fullscreenButton.setAttribute("aria-label", document.fullscreenElement ? "Exit fullscreen" : "Enter fullscreen");
+        if (this.rain.isPaused) this.showTools();
+    }
+
+    showTools() {
+        clearTimeout(this.idleTimer);
+        this.tools.classList.remove("controls-hidden");
+        this.idleTimer = setTimeout(() => {
+            if (!this.rain.isPaused && !this.overlay.open && !this.tools.contains(document.activeElement) && !this.tools.matches(":hover")) {
+                this.tools.classList.add("controls-hidden");
+            }
+        }, 2500);
+    }
+
+    async toggleFullscreen() {
+        try {
+            if (document.fullscreenElement) await document.exitFullscreen();
+            else await document.documentElement.requestFullscreen();
+            this.message.textContent = "";
+        } catch {
+            this.message.textContent = "Fullscreen isn't available in this browser.";
+            this.showTools();
+        }
     }
 }
 
@@ -682,17 +738,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const matrixRain = new MatrixRain("matrixCanvas", wordmarks);
 
         // Initialise the UI controller
-        const uiController = new UIController();
-
-        // Display controls information in console
-        console.log("Matrix Rain Controls:");
-        console.log("- SPACE or P: Pause/Resume");
-        console.log("- C: Cycle colour schemes");
-        console.log("- ↑ or +: Increase speed");
-        console.log("- ↓ or -: Decrease speed");
-        console.log("- R: Reset animation");
-        console.log("- Mouse: Interact with columns");
-        console.log("- Click ? button for help");
+        new UIController(matrixRain);
     } catch (error) {
         console.error("Failed to initialise Matrix Rain:", error);
     }
