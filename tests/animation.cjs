@@ -4,7 +4,8 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 
 const context = { setTransform() {}, fillRect() {}, fillText() {}, clearRect() {},
-    drawImage(image, x, y, width, height) { this.lastArtwork = { image, x, y, width, height }; },
+    createRadialGradient: () => ({ addColorStop() {} }),
+    drawImage(image, x, y, width, height) { if (width !== undefined) this.lastArtwork = { image, x, y, width, height }; },
     getImageData: () => ({ data: new Uint8ClampedArray(800 * 600 * 4).fill(255) }) };
 const canvas = { getContext: () => context, addEventListener() {}, removeEventListener() {},
     setAttribute(name, value) { this[name] = value; } };
@@ -97,4 +98,33 @@ branded.filmIndex = 1;
 branded.createTitle();
 assert.equal(context.lastArtwork, null, 'missing artwork uses the text fallback');
 assert.ok(branded.titleGlyphs.length > 0);
-console.log('Animation checks passed: timing, pause, pixel density, glyph grid, reduced motion, title hold, resize, loop, reset, trilogy order, accessible titles, artwork fit and fallback.');
+const feed = new sandbox.MatrixColumn(0, 600);
+feed.lag = 0.1;
+feed.y = 1;
+feed.targets = [{ y: 50, caughtAt: null }, { y: 70, caughtAt: null }];
+feed.targetIndex = 0;
+feed.getRandomSymbol = () => 'Z';
+moving.sequenceTime = 5;
+feed.update(0, 2, source => moving.captureColumn(feed, source));
+assert.equal(feed.targets[0].caughtAt, null, 'a title cannot catch a character before the stream reaches it');
+feed.update(0, 3, source => moving.captureColumn(feed, source));
+assert.equal(feed.targets[0].symbol, 'Z', 'title inherits the emitted rain character');
+assert.ok(feed.targets[0].caughtAt !== null);
+assert.equal(feed.targets[1].caughtAt, null);
+assert.ok(!feed.trail.some(character => character.y === 3), 'caught character leaves the rain trail');
+feed.update(0, 4, source => moving.captureColumn(feed, source));
+assert.equal(feed.targets[1].symbol, 'Z');
+moving.isPaused = true;
+const positions = moving.columns.map(column => column.y);
+moving.draw();
+assert.deepEqual(moving.columns.map(column => column.y), positions, 'paused drawing must not move source streams');
+moving.isPaused = false;
+moving.sequenceTime = 6;
+moving.filmIndex = 0;
+moving.createTitle();
+assert.ok(moving.titleGlyphs.some(glyph => glyph.caughtAt === null), 'first film is still forming at six seconds');
+moving.filmIndex = 1;
+moving.createTitle();
+assert.ok(moving.titleGlyphs.every(glyph => glyph.caughtAt !== null), 'Reloaded forms sooner');
+assert.ok(moving.distantColumns.every(column => column.fontSize < 20 && column.speed < 0.5), 'distant streams are smaller and slower');
+console.log('Animation checks passed, including real stream capture, removal from trails, pause, film pacing, depth, artwork fit and fallback.');

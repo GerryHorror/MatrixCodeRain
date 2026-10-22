@@ -8,12 +8,9 @@
  */
 const CONFIG = {
     FONT_SIZE: 20,
-    FADE_ALPHA: 0.05,
     RESET_PROBABILITY: 0.95,
     MIN_SPEED: 0.5,
     MAX_SPEED: 1.5,
-    HEAD_BRIGHTNESS: 1.0,
-    TRAIL_BRIGHTNESS: 0.6,
     DEFAULT_FPS: 30,
     SPEED_INCREMENT: 0.2,
     MIN_SPEED_MULTIPLIER: 0.3,
@@ -32,9 +29,9 @@ const SYMBOLS = {
 };
 
 const FILMS = [
-    { subtitle: "", year: "1999" },
-    { subtitle: "RELOADED", year: "2003" },
-    { subtitle: "REVOLUTIONS", year: "2003" }
+    { subtitle: "", year: "1999", formAt: 3, formFor: 4, releaseAt: 10, releaseFor: 2, sweep: 1.3, stagger: 0.3 },
+    { subtitle: "RELOADED", year: "2003", formAt: 2, formFor: 3, releaseAt: 9, releaseFor: 2, sweep: 0.8, stagger: 0.15 },
+    { subtitle: "REVOLUTIONS", year: "2003", formAt: 3, formFor: 4, releaseAt: 10, releaseFor: 3, sweep: 1.1, stagger: 0.9 }
 ];
 
 /**
@@ -76,12 +73,14 @@ class MatrixColumn {
      * @param {number} x - The x position (column index)
      * @param {number} canvasHeight - The height of the canvas
      */
-    constructor(x, canvasHeight) {
+    constructor(x, canvasHeight, fontSize = CONFIG.FONT_SIZE) {
         this.x = x;
+        this.fontSize = fontSize;
         this.reset(canvasHeight);
         this.speed = CONFIG.MIN_SPEED + Math.random() * (CONFIG.MAX_SPEED - CONFIG.MIN_SPEED);
         this.trail = [];
         this.trailLength = 15 + Math.floor(Math.random() * 10);
+        this.baseTrailLength = this.trailLength;
     }
 
     /**
@@ -89,7 +88,7 @@ class MatrixColumn {
      * @param {number} canvasHeight - The height of the canvas
      */
     reset(canvasHeight) {
-        this.y = Math.floor(Math.random() * canvasHeight / CONFIG.FONT_SIZE) * -1;
+        this.y = Math.floor(Math.random() * canvasHeight / this.fontSize) * -1;
         this.trail = [];
     }
 
@@ -97,16 +96,18 @@ class MatrixColumn {
      * Updates the column position
      * @param {number} speedMultiplier - Global speed multiplier
      */
-    update(speedMultiplier = 1.0) {
+    update(speedMultiplier = 1.0, targetY = null, onRow = null) {
         const previousRow = Math.floor(this.y);
-        this.y += this.speed * speedMultiplier;
+        this.y = targetY === null ? this.y + this.speed * speedMultiplier : targetY;
 
         // Update trail
         for (let row = Math.max(1, previousRow + 1); row <= Math.floor(this.y); row++) {
-            this.trail.unshift({
+            const character = {
                 y: row,
                 symbol: this.getRandomSymbol()
-            });
+            };
+            if (onRow && onRow(character)) continue;
+            this.trail.unshift(character);
 
             // Keep trail at specified length
             if (this.trail.length > this.trailLength) {
@@ -189,7 +190,7 @@ class MatrixRain {
             const height = width * wordmark.naturalHeight / wordmark.naturalWidth;
             const top = this.height / 2 - height / 2 - size * 0.25;
             ink.drawImage(wordmark, (this.width - width) / 2, top, width, height);
-            ink.font = `bold ${size * 0.32}px monospace`;
+            ink.font = `bold ${Math.max(22, size * 0.35)}px monospace`;
             ink.fillText(film.year, this.width / 2, top + height + size * 0.45);
         } else {
             // Keep the sequence usable if a local artwork asset cannot decode.
@@ -206,44 +207,110 @@ class MatrixRain {
             ink.fillText(film.year, this.width / 2, centreY + size * (film.subtitle ? 1.5 : 0.9));
         }
         const pixels = ink.getImageData(0, 0, mask.width, mask.height).data;
+        this.titleMask = mask;
+        this.tintTitle();
         this.titleCell = wordmark ? Math.max(1.5, Math.min(4, size / 40)) : Math.max(3, Math.min(8, size / 18));
         this.titleGlyphs = [];
+        this.columns.forEach(column => {
+            column.trailLength = Math.round(column.baseTrailLength * (this.filmIndex === 1 ? 1.4 : 1));
+            column.targets = [];
+            column.targetIndex = 0;
+        });
         for (let y = this.titleCell; y < this.height; y += this.titleCell) {
             for (let x = this.titleCell; x < this.width; x += this.titleCell) {
                 if (pixels[(Math.floor(y) * mask.width + Math.floor(x)) * 4 + 3] < 128) continue;
-                this.titleGlyphs.push({
-                    x, y,
-                    startY: -Math.random() * this.height,
-                    arrival: 0.8 + Math.random() * 3.2,
-                    release: Math.random() * 0.8,
-                    symbol: SYMBOLS.all.charAt(Math.floor(Math.random() * SYMBOLS.all.length))
-                });
+                const column = this.columns[Math.min(this.columns.length - 1, Math.floor(x / CONFIG.FONT_SIZE))];
+                const glyph = { x, y, column, caughtAt: null, symbol: "",
+                    release: (y / this.height * 0.65 + column.lag * 0.35) * film.stagger };
+                this.titleGlyphs.push(glyph);
+                column.targets.push(glyph);
             }
         }
+        this.streamsPrepared = false;
+        this.formationComplete = false;
+        if (this.sequenceTime >= film.formAt) this.formTitle();
+        this.titleShade = this.context.createRadialGradient(this.width / 2, this.height / 2, 0,
+            this.width / 2, this.height / 2, Math.max(this.width * 0.55, this.height * 0.35));
+        this.titleShade.addColorStop(0, "rgba(0, 0, 0, 0.8)");
+        this.titleShade.addColorStop(1, "rgba(0, 0, 0, 0)");
         const title = `THE MATRIX${film.subtitle ? " " + film.subtitle : ""} (${film.year})`;
         this.canvas.setAttribute("aria-label", `Digital rain forms ${title}, holds, then falls away. Use Space to pause or resume.`);
     }
 
+    tintTitle() {
+        this.titleGlow = document.createElement("canvas");
+        this.titleGlow.width = this.width;
+        this.titleGlow.height = this.height;
+        const glow = this.titleGlow.getContext("2d");
+        glow.drawImage(this.titleMask, 0, 0);
+        glow.globalCompositeOperation = "source-in";
+        glow.fillStyle = COLOUR_SCHEMES[this.currentScheme].body;
+        glow.fillRect(0, 0, this.width, this.height);
+    }
+
+    /** Sweep the existing streams through the mask, catching their real characters. */
+    formTitle() {
+        const film = FILMS[this.filmIndex];
+        if (!this.streamsPrepared) {
+            this.columns.forEach(column => {
+                column.y = -column.lag * this.height / CONFIG.FONT_SIZE;
+                column.trail = [];
+            });
+            this.streamsPrepared = true;
+        }
+        const progress = Math.min(1, Math.max(0, (this.sequenceTime - film.formAt) / film.formFor)) ** film.sweep;
+        this.columns.forEach(column => {
+            const end = this.height / CONFIG.FONT_SIZE + 1;
+            column.update(0, end * (progress * (1 + column.lag) - column.lag),
+                character => this.captureColumn(column, character));
+        });
+        this.formationComplete = progress >= 1;
+    }
+
+    captureColumn(column, source) {
+        let consumed = false;
+        while (column.targetIndex < column.targets.length) {
+            const glyph = column.targets[column.targetIndex];
+            if (glyph.y > source.y * CONFIG.FONT_SIZE) break;
+            glyph.symbol = source.symbol;
+            const film = FILMS[this.filmIndex];
+            const phase = (source.y / (this.height / CONFIG.FONT_SIZE + 1) + column.lag) / (1 + column.lag);
+            glyph.caughtAt = Math.min(this.sequenceTime, film.formAt + phase ** (1 / film.sweep) * film.formFor);
+            consumed = true;
+            column.targetIndex++;
+        }
+        return consumed;
+    }
+
     drawTitle() {
         const time = this.sequenceTime;
-        if (time < 3 || time >= 12) return;
+        const film = FILMS[this.filmIndex];
+        if (time < film.formAt || time >= film.releaseAt + film.releaseFor) return;
         const ctx = this.context;
         const scheme = COLOUR_SCHEMES[this.currentScheme];
-        ctx.font = `${this.titleCell}px monospace`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
+        const resolved = Math.min(1, Math.max(0, (time - film.formAt - film.formFor) / 0.6));
+        if (resolved > 0 && time < film.releaseAt) {
+            ctx.globalAlpha = resolved * 0.32;
+            ctx.shadowColor = scheme.body;
+            ctx.shadowBlur = 9;
+            ctx.drawImage(this.titleGlow, 0, 0);
+            ctx.shadowBlur = 0;
+        }
         for (const glyph of this.titleGlyphs) {
-            const progress = Math.min(1, (time - 3) / glyph.arrival);
-            const released = Math.max(0, time - 10 - glyph.release);
-            const y = glyph.startY + (glyph.y - glyph.startY) * progress
-                + released * released * this.height;
+            if (glyph.caughtAt === null) continue;
+            const settle = Math.min(1, Math.max(0, (time - glyph.caughtAt) / 0.4));
+            const released = Math.max(0, time - film.releaseAt - glyph.release);
+            const fall = released * released * this.height * (this.filmIndex === 2 ? 0.55 : 1);
+            const sourceX = glyph.column.x * CONFIG.FONT_SIZE;
+            const x = sourceX + (glyph.x - sourceX) * settle * Math.max(0, 1 - released);
+            const y = glyph.y + fall;
             if (y < 0 || y > this.height) continue;
-            if (progress < 1 && Math.random() < 0.2) {
-                glyph.symbol = SYMBOLS.all.charAt(Math.floor(Math.random() * SYMBOLS.all.length));
-            }
-            ctx.globalAlpha = released > 0 ? Math.max(0, 1 - released) : 1;
-            ctx.fillStyle = progress < 1 || released > 0 ? scheme.head : scheme.body;
-            ctx.fillText(glyph.symbol, glyph.x, y);
+            ctx.font = `${this.titleCell + (CONFIG.FONT_SIZE - this.titleCell) * (1 - settle)}px monospace`;
+            ctx.globalAlpha = Math.max(0, 1 - released / film.releaseFor);
+            ctx.fillStyle = settle < 1 || released > 0 ? scheme.head : scheme.body;
+            ctx.fillText(glyph.symbol, x, y);
         }
         ctx.globalAlpha = 1;
         ctx.textAlign = "start";
@@ -270,8 +337,16 @@ class MatrixRain {
         this.columns = [];
 
         for (let i = 0; i < columnCount; i++) {
-            this.columns.push(new MatrixColumn(i, this.height));
+            const column = new MatrixColumn(i, this.height);
+            column.lag = Math.random() * 0.35;
+            this.columns.push(column);
         }
+        this.distantColumns = Array.from({ length: Math.ceil(this.width / 28) }, (_, i) => {
+            const column = new MatrixColumn(i * 28 / 12, this.height, 12);
+            column.speed *= 0.3;
+            column.y = Math.random() * this.height / 12;
+            return column;
+        });
     }
 
     /**
@@ -382,6 +457,8 @@ class MatrixRain {
         const currentIndex = schemeNames.indexOf(this.currentScheme);
         const nextIndex = (currentIndex + 1) % schemeNames.length;
         this.currentScheme = schemeNames[nextIndex];
+        this.tintTitle();
+        if (this.isPaused) this.draw();
         const schemeName = COLOUR_SCHEMES[this.currentScheme].name;
         console.log(`Colour scheme: ${schemeName}`);
     }
@@ -471,59 +548,43 @@ class MatrixRain {
                 this.createTitle();
             }
         }
-        // Create fade effect with darker background
-        const titleActive = this.sequenceTime >= 3 && this.sequenceTime < 12;
-        this.context.fillStyle = `rgba(0, 0, 0, ${titleActive ? 0.24 : CONFIG.FADE_ALPHA})`;
-        this.context.fillRect(0, 0, this.width, this.height);
-
-        // Set font properties with bold for better visibility
-        this.context.font = `bold ${CONFIG.FONT_SIZE}px monospace`;
-
-        // Get current colour scheme
-        const scheme = COLOUR_SCHEMES[this.currentScheme];
-        this.context.globalAlpha = titleActive ? 0.22 : 1;
-
-        // Draw each column
-        this.columns.forEach((column) => {
-            const x = column.x * CONFIG.FONT_SIZE;
-
-            // Draw the trail
-            column.trail.forEach((char, index) => {
-                // Calculate opacity based on position in trail
-                const opacity = 1 - (index / column.trailLength);
-
-                // Determine colour based on position
-                let colour;
-                if (index === 0) {
-                    // Brightest head character
-                    colour = scheme.head;
-                } else if (index < 3) {
-                    // Near head - bright body colour
-                    colour = scheme.body;
-                } else {
-                    // Fading tail
-                    colour = scheme.tail;
+        const film = FILMS[this.filmIndex];
+        const forming = this.sequenceTime >= film.formAt && this.sequenceTime <= film.formAt + film.formFor;
+        const titleActive = this.sequenceTime >= film.formAt && this.sequenceTime < film.releaseAt + film.releaseFor;
+        if (!this.isPaused) {
+            if (this.sequenceTime >= film.formAt && !this.formationComplete) this.formTitle();
+            for (const column of [...this.columns, ...this.distantColumns]) {
+                if (!forming || column.fontSize !== CONFIG.FONT_SIZE) column.update(this.speedMultiplier);
+                if (!forming && (column.y - column.trailLength) * column.fontSize > this.height && Math.random() > CONFIG.RESET_PROBABILITY) {
+                    column.reset(this.height);
                 }
-
-                // Parse hex colour and add opacity
-                const r = parseInt(colour.slice(1, 3), 16);
-                const g = parseInt(colour.slice(3, 5), 16);
-                const b = parseInt(colour.slice(5, 7), 16);
-
-                this.context.fillStyle = `rgba(${r}, ${g}, ${b}, ${opacity})`;
-                this.context.fillText(char.symbol, x, char.y * CONFIG.FONT_SIZE);
-            });
-
-            // Update column position with speed multiplier
-            column.update(this.speedMultiplier);
-
-            // Reset column if it goes off screen
-            if ((column.y - column.trailLength) * CONFIG.FONT_SIZE > this.height && Math.random() > CONFIG.RESET_PROBABILITY) {
-                column.reset(this.height);
             }
-        });
+        }
+        this.context.fillStyle = "black";
+        this.context.fillRect(0, 0, this.width, this.height);
+        this.drawColumns(this.distantColumns, titleActive ? 0.09 : 0.16);
+        this.drawColumns(this.columns, titleActive ? 0.48 : 0.85);
+        if (titleActive) {
+            this.context.globalAlpha = Math.min(1, (this.sequenceTime - film.formAt) / film.formFor);
+            this.context.fillStyle = this.titleShade;
+            this.context.fillRect(0, 0, this.width, this.height);
+        }
         this.context.globalAlpha = 1;
         this.drawTitle();
+    }
+
+    drawColumns(columns, opacity) {
+        const ctx = this.context;
+        const scheme = COLOUR_SCHEMES[this.currentScheme];
+        for (const column of columns) {
+            ctx.font = `${column.fontSize === CONFIG.FONT_SIZE ? "bold " : ""}${column.fontSize}px monospace`;
+            column.trail.forEach((character, index) => {
+                ctx.globalAlpha = opacity * (1 - index / column.trailLength) ** 1.5;
+                ctx.fillStyle = index === 0 && column.fontSize === CONFIG.FONT_SIZE ? scheme.head : scheme.body;
+                ctx.fillText(character.symbol, column.x * column.fontSize, character.y * column.fontSize);
+            });
+        }
+        ctx.globalAlpha = 1;
     }
 
     /**
