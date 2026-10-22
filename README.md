@@ -1,20 +1,36 @@
 # Matrix Code Rain
 
-A small canvas tribute to the original Matrix trilogy, built with plain HTML, CSS and JavaScript.
+This is a little passion project of mine. I'm a big fan of the original Matrix trilogy, and apparently watching green code fall down a screen never gets old.
 
-Falling code gathers into each film's title and year, holds, then falls away:
+The idea was to have the rain form each movie's title, hang there for a bit, then fall back into the code. That's what it does now, years included.
+
+![Falling code forming the original Matrix trilogy titles and years](./assets/previews/trilogy-rain.gif)
+
+## The trilogy
 
 1. **THE MATRIX (1999)**
 2. **THE MATRIX RELOADED (2003)**
 3. **THE MATRIX REVOLUTIONS (2003)**
 
-Background rain continues through the sequence. Each film takes 15 seconds: three seconds of rain, four of formation, three holding the title, two releasing it, then three of rain. The full trilogy repeats every 45 seconds.
+<p>
+  <a href="./assets/previews/the-matrix.png"><img src="./assets/previews/the-matrix.png" width="32%" alt="The Matrix (1999) formed from green code"></a>
+  <a href="./assets/previews/reloaded.png"><img src="./assets/previews/reloaded.png" width="32%" alt="The Matrix Reloaded (2003) formed from green code"></a>
+  <a href="./assets/previews/revolutions.png"><img src="./assets/previews/revolutions.png" width="32%" alt="The Matrix Revolutions (2003) formed from green code"></a>
+</p>
 
-## Run
+Each title gets 15 seconds before the next one takes over. The whole thing loops every 45 seconds, with the rain carrying on behind it. The GIF is a shorter preview of each title forming, captured from the project itself.
 
-Open [index.html](./index.html) in a browser. No installation or build step is needed.
+## Give it a go
 
-For a local server, run `python3 -m http.server 8765` and open <http://localhost:8765>.
+Open [index.html](./index.html) in your browser. That's it. It's plain HTML, CSS and JavaScript, so there's nothing to install or build.
+
+If you'd rather use a local server:
+
+```sh
+python3 -m http.server 8765
+```
+
+Then open <http://localhost:8765>.
 
 ## Controls
 
@@ -28,20 +44,19 @@ For a local server, run `python3 -m http.server 8765` and open <http://localhost
 | Mouse | Move a background rain column |
 | ? button | Show controls; Escape closes them |
 
-Title timing stays fixed when rain speed changes. Resizing preserves the current film and sequence phase and rebuilds the glyph layout for the new screen size. Screens requesting reduced motion start with a still first title; Space explicitly starts animation.
+The speed controls change the background rain; the titles keep their timing. Resizing keeps your place in the trilogy. If your device asks for reduced motion, it starts on a still title. Press Space when you want it moving.
 
-## Verification
+## Checking things still work
 
-Run `node --check script.js` and `node tests/animation.cjs`.
+```sh
+node --check script.js
+node tests/animation.cjs
+```
 
-The focused checks cover refresh-rate-independent timing, pause, pixel density, grid spacing, reduced motion, the title hold, resizing, trilogy order, accessible titles, looping, reset, artwork proportions and text fallback. They use a canvas stub; actual typography requires browser inspection.
+These cover the animation logic: timing, pause and reset, resizing, trilogy order, reduced motion and artwork fallback. Desktop and phone layouts have also been checked in the browser, along with opening the page straight from disk.
 
-Browser smoke verification covered all three films in order, their years, return to the first film, pause freezing the canvas, resizing while on a sequel, and absence of JavaScript errors. Desktop captures of both sequels and a phone capture of Revolutions were inspected. Earlier checks covered title release, reduced motion and controls opening and closing with Escape. Captures and browser session files stay local and are ignored by Git.
+## A note on the lettering
 
-The wordmark pass also verified that all three artwork masks render, inspected settled titles at desktop and phone sizes, opened the page directly from disk with readable canvas pixels, and simulated failed image decoding to check the text fallback.
+The title shapes come from sourced film wordmarks. The code uses them as a guide for where the little falling characters should settle. Small details depend on the screen size and glyph spacing.
 
-## Lettering
-
-Each film uses sourced wordmark artwork as a mask, preserving its letter shapes, connected serifs, spacing and subtitle treatment. The rain renders those silhouettes using small glyphs rather than displaying the original images. Fine details are limited by glyph spacing and screen size; this is not a pixel-identical theatrical title recreation. Years remain browser text.
-
-The masks are embedded locally, with no external fonts, image requests or build step. If artwork fails to decode, that film falls back to the previous browser text mask. See [artwork sources and preparation](./assets/wordmarks/SOURCES.md) for provenance and rights notes.
+Everything needed is stored locally. If the artwork can't load, the titles fall back to ordinary text. [Artwork sources, credits and rights notes are here](./assets/wordmarks/SOURCES.md).
