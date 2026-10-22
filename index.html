@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Interactive Matrix digital rain animation with keyboard controls and colour customisation">
     <meta name="author" content="Matrix Rain">
     <meta name="theme-color" content="#000000">
@@ -13,27 +13,39 @@
 
 <body>
     <!-- Main canvas element for the animation -->
-    <canvas id="matrixCanvas" role="img" aria-label="Matrix digital rain animation"></canvas>
+    <canvas id="matrixCanvas" role="img" aria-label="Digital rain forms THE MATRIX (1999), holds, then falls away. Use Space to pause or resume."></canvas>
 
     <!-- Control instructions overlay -->
-    <div class="controls-overlay" role="complementary" aria-label="Keyboard controls">
+    <dialog class="controls-overlay" aria-labelledby="controlsTitle">
         <div class="controls-content">
-            <h2>Controls</h2>
+            <h2 id="controlsTitle">Controls</h2>
             <ul>
                 <li><kbd>Space</kbd> or <kbd>P</kbd> - Pause/Resume</li>
                 <li><kbd>C</kbd> - Cycle colour schemes</li>
                 <li><kbd>↑</kbd> or <kbd>+</kbd> - Increase speed</li>
                 <li><kbd>↓</kbd> or <kbd>-</kbd> - Decrease speed</li>
                 <li><kbd>R</kbd> - Reset animation</li>
+                <li><kbd>←</kbd> / <kbd>→</kbd> - Previous/Next film</li>
+                <li><kbd>F</kbd> - Fullscreen</li>
                 <li><strong>Mouse</strong> - Interact with columns</li>
             </ul>
             <button id="closeControls" aria-label="Close controls">Close</button>
         </div>
+    </dialog>
+
+    <div class="viewing-controls" role="group" aria-label="Viewing controls">
+        <p id="currentFilm" class="film-label" aria-live="polite"></p>
+        <div class="transport">
+            <button id="previousFilm" aria-label="Previous film" title="Previous film (Left arrow)">‹</button>
+            <button id="togglePause" aria-label="Pause animation" aria-pressed="false">Pause</button>
+            <button id="nextFilm" aria-label="Next film" title="Next film (Right arrow)">›</button>
+            <button id="toggleFullscreen" aria-label="Enter fullscreen" title="Fullscreen (F)">⛶</button>
+            <button id="showControls" aria-label="Show keyboard controls" title="Controls">?</button>
+        </div>
+        <p id="viewerMessage" class="viewer-message" role="status"></p>
     </div>
 
-    <!-- Button to show controls -->
-    <button id="showControls" class="show-controls-btn" aria-label="Show keyboard controls">?</button>
-
+    <script src="assets/wordmarks.js"></script>
     <script src="script.js"></script>
 </body>
 
