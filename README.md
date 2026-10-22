@@ -2,7 +2,7 @@
 
 This is a little passion project of mine. I'm a big fan of the original Matrix trilogy, and apparently watching green code fall down a screen never gets old.
 
-The idea was to have the rain form each movie's title, hang there for a bit, then fall back into the code. That's what it does now, years included.
+The idea was to have the rain form each movie's title, hang there for a bit, then fall back into the code. That's what it does now, years included. Characters get caught straight out of the falling streams and settle into the lettering.
 
 ![Falling code forming the original Matrix trilogy titles and years](./assets/previews/trilogy-rain.gif)
 
@@ -18,7 +18,9 @@ The idea was to have the rain form each movie's title, hang there for a bit, the
   <a href="./assets/previews/revolutions.png"><img src="./assets/previews/revolutions.png" width="32%" alt="The Matrix Revolutions (2003) formed from green code"></a>
 </p>
 
-Each title gets 15 seconds before the next one takes over. The whole thing loops every 45 seconds, with the rain carrying on behind it. The GIF is a shorter preview of each title forming, captured from the project itself.
+Each title gets 15 seconds before the next one takes over. The first film takes its time, Reloaded builds faster, and Revolutions falls away in a slower cascade. The whole thing loops every 45 seconds.
+
+Smaller, slower streams sit in the distance, with a bit of glow and darker rain behind the titles to help the lettering stand out. The GIF is a shorter look at the reveals and releases, captured from the project itself.
 
 ## Give it a go
 
@@ -41,10 +43,14 @@ Then open <http://localhost:8765>.
 | Up / + | Increase background rain speed |
 | Down / - | Decrease background rain speed |
 | R | Restart from THE MATRIX (1999) |
+| Left / Right | Previous or next film |
+| F | Enter or exit fullscreen |
 | Mouse | Move a background rain column |
 | ? button | Show controls; Escape closes them |
 
-The speed controls change the background rain; the titles keep their timing. Resizing keeps your place in the trilogy. If your device asks for reduced motion, it starts on a still title. Press Space when you want it moving.
+Move the pointer, tap the screen or use the keyboard to bring up the viewing controls. There's pause/play, previous/next, fullscreen and help. They fade away while you're watching and stay visible while paused or focused with the keyboard.
+
+The speed controls change the free-flowing rain; the title capture keeps its timing. Resizing keeps your place in the trilogy. If your device asks for reduced motion, it starts on a still title. You can browse the films while paused, or press Play when you want it moving. Fullscreen depends on browser support.
 
 ## Checking things still work
 
@@ -53,10 +59,10 @@ node --check script.js
 node tests/animation.cjs
 ```
 
-These cover the animation logic: timing, pause and reset, resizing, trilogy order, reduced motion and artwork fallback. Desktop and phone layouts have also been checked in the browser, along with opening the page straight from disk.
+These cover the animation logic: real stream capture, timing, pause and reset, film navigation, resizing, trilogy order, reduced motion and artwork fallback. Browser checks covered desktop and touch-emulated phone layouts, keyboard controls, help, idle hiding and fullscreen in Chrome, plus opening the page straight from disk.
 
 ## A note on the lettering
 
-The title shapes come from sourced film wordmarks. The code uses them as a guide for where the little falling characters should settle. Small details depend on the screen size and glyph spacing.
+The title shapes come from sourced film wordmarks. The code uses them as a guide for where the little falling characters should settle, with a faint outline underneath for the finer details. Small details still depend on the screen size and glyph spacing.
 
 Everything needed is stored locally. If the artwork can't load, the titles fall back to ordinary text. [Artwork sources, credits and rights notes are here](./assets/wordmarks/SOURCES.md).

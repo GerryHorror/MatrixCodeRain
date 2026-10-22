@@ -1,6 +1,6 @@
 # Title artwork sources
 
-These masks preserve the sourced wordmark silhouettes, including the connected serifs and letter spacing. They are used only to position falling glyphs. Release years are separate browser text.
+These masks preserve the sourced wordmark silhouettes, including the connected serifs and letter spacing. They guide falling glyphs and provide a faint glowing silhouette behind the settled title. Release years are separate browser text.
 
 | Film | Source | Original asset |
 | --- | --- | --- |
