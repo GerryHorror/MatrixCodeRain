@@ -31,3 +31,7 @@ yarn.lock
 
 # Ignore macOS specific files
 .DS_Store
+
+# Local browser verification captures and session logs
+.playwright-cli/
+output/playwright/
